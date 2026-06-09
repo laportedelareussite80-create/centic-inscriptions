@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Suspense } from 'react'
 
 interface Classe { id: string; nom: string; categorie: string }
-interface Module { id: string; nom: string; description: string; categorie: string }
+interface Module { id: string; nom: string; description: string; categorie: string; est_actif: boolean }
 interface Session { id: string; nom: string; categorie: string; annee_id: string }
 interface Annee { id: string; nom: string; annee: number; est_active: boolean }
 
