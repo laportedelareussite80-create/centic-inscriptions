@@ -55,6 +55,12 @@ function InscriptionForm() {
     if (form.classe_id) fetchModulesParClasse(form.classe_id)
   }, [form.classe_id])
 
+  useEffect(() => {
+  if (cameraActive) {
+    startCamera()
+  }
+}, [cameraActive])
+
   const fetchData = async () => {
     const [{ data: c }, { data: m }, { data: s }, { data: a }] = await Promise.all([
       supabase.from('classes').select('*').eq('categorie', categorie).order('ordre'),
@@ -86,34 +92,50 @@ function InscriptionForm() {
   // Camera
 const startCamera = async () => {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ 
-      video: { width: 640, height: 480, facingMode: 'user' } 
+    if (videoRef.current?.srcObject) {
+      const old = videoRef.current.srcObject as MediaStream
+      old.getTracks().forEach(t => t.stop())
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user' },
+      audio: false
     })
     if (videoRef.current) {
       videoRef.current.srcObject = stream
-      videoRef.current.onloadedmetadata = () => {
-        videoRef.current?.play()
+      videoRef.current.muted = true
+      videoRef.current.onloadedmetadata = async () => {
+        try { await videoRef.current?.play() } catch {}
       }
-      setCameraActive(true)
     }
-  } catch (err) {
-    console.error(err)
-    alert('Impossible d\'accéder à la caméra. Utilisez "Importer une image" à la place.')
+  } catch (err: any) {
+    setCameraActive(false)
+    const messages: Record<string, string> = {
+      NotAllowedError: 'Accès refusé. Autorisez la caméra dans votre navigateur.',
+      NotFoundError: 'Aucune caméra détectée.',
+      NotReadableError: 'Caméra utilisée par une autre application.',
+    }
+    alert(messages[err.name] || 'Erreur caméra. Utilisez "Importer une image".')
   }
 }
 
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d')
-      canvasRef.current.width = videoRef.current.videoWidth
-      canvasRef.current.height = videoRef.current.videoHeight
-      ctx?.drawImage(videoRef.current, 0, 0)
-      setPhoto(canvasRef.current.toDataURL('image/jpeg', 0.8))
-      const stream = videoRef.current.srcObject as MediaStream
-      stream?.getTracks().forEach(t => t.stop())
-      setCameraActive(false)
-    }
+const capturePhoto = () => {
+  if (videoRef.current && canvasRef.current) {
+    const video = videoRef.current
+    canvasRef.current.width = video.videoWidth
+    canvasRef.current.height = video.videoHeight
+    const ctx = canvasRef.current.getContext('2d')
+    // Retourner l'image pour annuler l'effet miroir
+    ctx?.save()
+    ctx?.translate(canvasRef.current.width, 0)
+    ctx?.scale(-1, 1)
+    ctx?.drawImage(video, 0, 0)
+    ctx?.restore()
+    setPhoto(canvasRef.current.toDataURL('image/jpeg', 0.8))
+    const stream = video.srcObject as MediaStream
+    stream?.getTracks().forEach(t => t.stop())
+    setCameraActive(false)
   }
+}
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -507,76 +529,132 @@ const startCamera = async () => {
           )}
 
           {/* ETAPE 2 — Photo */}
-          {step === 2 && (
-            <div>
-              <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0D1B4B', marginBottom: '6px' }}>
-                Étape 2 — Photo
-              </h2>
-              <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>
-                Prenez ou importez une photo de l'apprenant
-              </p>
+{step === 2 && (
+  <div>
+    <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0D1B4B', marginBottom: '6px' }}>
+      Étape 2 — Photo
+    </h2>
+    <p style={{ color: '#888', fontSize: '14px', marginBottom: '24px' }}>
+      Prenez ou importez une photo de l'apprenant
+    </p>
 
-              {photo ? (
-                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                  <img src={photo} alt="Photo"
-                    style={{ width: '180px', height: '180px', objectFit: 'cover',
-                      borderRadius: '16px', border: '4px solid #2563EB',
-                      boxShadow: '0 8px 24px rgba(37,99,235,0.2)' }} />
-                  <br />
-                  <button onClick={() => setPhoto(null)} style={{
-                    marginTop: '12px', background: '#fee2e2', color: '#dc2626',
-                    border: 'none', padding: '8px 20px', borderRadius: '8px',
-                    fontSize: '13px', fontWeight: '700', cursor: 'pointer'
-                  }}>
-                    🔄 Changer la photo
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  {cameraActive ? (
-                    <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                      <video ref={videoRef} autoPlay playsInline muted
-  style={{ 
-    width: '100%', maxWidth: '400px', borderRadius: '12px',
-    border: '3px solid #2563EB', display: 'block', margin: '0 auto'
-  }} />
-                      <br />
-                      <button onClick={capturePhoto} style={{
-                        marginTop: '12px', background: '#2563EB', color: 'white',
-                        border: 'none', padding: '12px 32px', borderRadius: '10px',
-                        fontSize: '15px', fontWeight: '700', cursor: 'pointer'
-                      }}>
-                        📸 Capturer la photo
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                      <button onClick={startCamera} style={{
-                        padding: '32px 16px', borderRadius: '16px', border: '2px dashed #2563EB',
-                        background: '#eff6ff', color: '#2563EB', cursor: 'pointer',
-                        fontSize: '15px', fontWeight: '700', textAlign: 'center'
-                      }}>
-                        <div style={{ fontSize: '36px', marginBottom: '8px' }}>📷</div>
-                        Utiliser la caméra
-                      </button>
-                      <label style={{
-                        padding: '32px 16px', borderRadius: '16px', border: '2px dashed #10b981',
-                        background: '#ecfdf5', color: '#059669', cursor: 'pointer',
-                        fontSize: '15px', fontWeight: '700', textAlign: 'center', display: 'block'
-                      }}>
-                        <div style={{ fontSize: '36px', marginBottom: '8px' }}>📁</div>
-                        Importer une image
-                        <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
-                      </label>
-                    </div>
-                  )}
-                </div>
-              )}
-              <canvas ref={canvasRef} style={{ display: 'none' }} />
-              {errors.photo && <p style={{ color: '#ef4444', fontSize: '13px', textAlign: 'center' }}>{errors.photo}</p>}
-            </div>
-          )}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
 
+      {/* Carré photo */}
+      <div style={{
+        width: '160px', height: '160px', borderRadius: '12px',
+        border: '2px dashed #2563EB', background: '#f8faff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden', flexShrink: 0
+      }}>
+        {photo ? (
+          <img src={photo} alt="Photo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <div style={{ textAlign: 'center', color: '#ccc' }}>
+            <div style={{ fontSize: '48px' }}>👤</div>
+            <p style={{ fontSize: '11px', marginTop: '4px' }}>Aucune photo</p>
+          </div>
+        )}
+      </div>
+
+      {/* Boutons */}
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <button
+          onClick={() => setCameraActive(true)}
+          style={{
+            background: '#2563EB', color: 'white', border: 'none',
+            padding: '10px 20px', borderRadius: '10px', fontSize: '14px',
+            fontWeight: '700', cursor: 'pointer', display: 'flex',
+            alignItems: 'center', gap: '6px'
+          }}>
+          📷 Prendre une photo
+        </button>
+
+        <label style={{
+          background: '#f3f4f6', color: '#444', border: 'none',
+          padding: '10px 20px', borderRadius: '10px', fontSize: '14px',
+          fontWeight: '700', cursor: 'pointer', display: 'flex',
+          alignItems: 'center', gap: '6px'
+        }}>
+          🖼️ Importer une photo
+          <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+        </label>
+      </div>
+
+      <p style={{ fontSize: '11px', color: '#aaa' }}>JPG, PNG — max 5 Mo</p>
+    </div>
+
+    {/* MODAL CAMERA */}
+    {cameraActive && (
+      <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.85)', zIndex: 9999,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', padding: '20px'
+      }}>
+        <div style={{
+          background: 'white', borderRadius: '20px', padding: '24px',
+          width: '100%', maxWidth: '500px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#0D1B4B' }}>
+              Prendre une photo
+            </h3>
+            <button onClick={() => {
+              const stream = videoRef.current?.srcObject as MediaStream
+              stream?.getTracks().forEach(t => t.stop())
+              setCameraActive(false)
+            }} style={{
+              background: 'none', border: 'none', fontSize: '20px',
+              cursor: 'pointer', color: '#666'
+            }}>✕</button>
+          </div>
+
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{
+              width: '100%', borderRadius: '12px',
+              background: '#000', display: 'block',
+              transform: 'scaleX(-1)'
+            }}
+          />
+          <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+          <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+            <button onClick={() => {
+              const stream = videoRef.current?.srcObject as MediaStream
+              stream?.getTracks().forEach(t => t.stop())
+              setCameraActive(false)
+            }} style={{
+              flex: 1, background: '#f3f4f6', color: '#666', border: 'none',
+              padding: '12px', borderRadius: '10px', fontSize: '14px',
+              fontWeight: '700', cursor: 'pointer'
+            }}>
+              Annuler
+            </button>
+            <button onClick={capturePhoto} style={{
+              flex: 2, background: '#2563EB', color: 'white', border: 'none',
+              padding: '12px', borderRadius: '10px', fontSize: '14px',
+              fontWeight: '700', cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', gap: '8px'
+            }}>
+              📸 Capturer
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {errors.photo && (
+      <p style={{ color: '#ef4444', fontSize: '13px', textAlign: 'center', marginTop: '8px' }}>
+        {errors.photo}
+      </p>
+    )}
+  </div>
+)}
           {/* ETAPE 3 — Modules */}
           {step === 3 && (
             <div>
