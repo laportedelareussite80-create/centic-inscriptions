@@ -186,14 +186,14 @@ const capturePhoto = () => {
       // Upload photo vers Supabase Storage ou utiliser base64
       let photoUrl = photo
 
-      // Générer le numéro d'inscription
-      const { count } = await supabase
-        .from('inscriptions')
-        .select('*', { count: 'exact', head: true })
-        .eq('annee_id', anneeActive?.id)
+// Générer le numéro d'inscription de façon atomique (côté serveur)
+      const { data: numero, error: numeroError } = await supabase
+        .rpc('generer_numero_inscription', {
+          p_annee_id: anneeActive?.id,
+          p_annee: anneeActive?.annee || 2026
+        })
 
-      const sequence = String((count || 0) + 1).padStart(4, '0')
-      const numero = `CENTIC-${anneeActive?.annee || 2026}-${sequence}`
+      if (numeroError) throw numeroError
 
       // Créer l'inscription
       const inscriptionData: any = {
