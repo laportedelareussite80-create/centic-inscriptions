@@ -18,12 +18,12 @@ export default function ExportsPage() {
 
   useEffect(() => { fetchOptions() }, [])
   useEffect(() => {
-  if (filters.annee_id) {
-    fetchCount()
-  } else {
-    setCount(null)
-  }
-}, [filters])
+    if (filters.annee_id) {
+      fetchCount()
+    } else {
+      setCount(null)
+    }
+  }, [filters])
 
   const fetchOptions = async () => {
     const [{ data: a }, { data: s }, { data: c }, { data: m }] = await Promise.all([
@@ -38,13 +38,24 @@ export default function ExportsPage() {
     setModules(m || [])
   }
 
-  const buildQuery = () => {
+  // Si un module est sélectionné, on récupère d'abord la liste des inscription_id
+  // qui appartiennent à ce module (relation many-to-many via inscriptions_modules)
+  const getInscriptionIdsPourModule = async (): Promise<string[] | null> => {
+    if (!filters.module_id) return null
+    const { data } = await supabase
+      .from('inscriptions_modules')
+      .select('inscription_id')
+      .eq('module_id', filters.module_id)
+    return (data || []).map((row: any) => row.inscription_id)
+  }
+
+  const buildQuery = async () => {
     let q = supabase.from('inscriptions').select(`
       *,
       classe:classes(nom),
       session:sessions(nom),
       annee:annees_formation(nom, annee),
-      modules:inscriptions_modules(module:modules(nom)),
+      modules:inscriptions_modules(module:modules(id, nom)),
       tuteurs(nom_complet, telephone_principal, telephone_whatsapp, quartier)
     `)
     if (filters.annee_id) q = q.eq('annee_id', filters.annee_id)
@@ -52,18 +63,43 @@ export default function ExportsPage() {
     if (filters.categorie) q = q.eq('categorie', filters.categorie)
     if (filters.classe_id) q = q.eq('classe_id', filters.classe_id)
     if (filters.statut) q = q.eq('statut', filters.statut)
+
+    if (filters.module_id) {
+      const ids = await getInscriptionIdsPourModule()
+      if (!ids || ids.length === 0) {
+        // Aucune inscription pour ce module → on force un résultat vide
+        q = q.in('id', ['00000000-0000-0000-0000-000000000000'])
+      } else {
+        q = q.in('id', ids)
+      }
+    }
+
     return q.order('created_at', { ascending: false })
   }
 
   const fetchCount = async () => {
-    const { data } = await buildQuery()
+    const q = await buildQuery()
+    const { data } = await q
     setCount(data?.length || 0)
+  }
+
+  // Si un filtre module est actif, n'affiche que ce module dans la colonne "Modules"
+  // (un élève peut être inscrit à plusieurs modules, mais l'export filtré ne doit
+  // montrer que celui qui a été sélectionné dans le filtre)
+  const getModulesAffiches = (ins: any): string => {
+    const tousLesModules = (ins.modules || []).map((m: any) => m.module).filter(Boolean)
+    if (filters.module_id) {
+      const moduleFiltre = tousLesModules.find((m: any) => m.id === filters.module_id)
+      return moduleFiltre ? moduleFiltre.nom : ''
+    }
+    return tousLesModules.map((m: any) => m.nom).join(', ')
   }
 
   const exportExcel = async () => {
     setLoading(true)
     try {
-      const { data } = await buildQuery()
+      const q = await buildQuery()
+      const { data } = await q
       if (!data || data.length === 0) {
         alert('Aucune inscription trouvée avec ces filtres.')
         setLoading(false)
@@ -81,7 +117,7 @@ export default function ExportsPage() {
         'Catégorie': ins.categorie,
         'Classe/Niveau': ins.classe?.nom || ins.niveau_etude || '',
         'Établissement': ins.etablissement || '',
-        'Modules': (ins.modules || []).map((m: any) => m.module?.nom).filter(Boolean).join(', '),
+        'Modules': getModulesAffiches(ins),
         'Session': ins.session?.nom || '',
         'Année': ins.annee?.nom || '',
         'Statut': ins.statut,
@@ -104,7 +140,6 @@ export default function ExportsPage() {
       const ws = XLSX.utils.json_to_sheet(rows)
       const wb = XLSX.utils.book_new()
 
-      // Style entêtes
       const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
       for (let c = range.s.c; c <= range.e.c; c++) {
         const cell = XLSX.utils.encode_cell({ r: 0, c })
@@ -117,7 +152,6 @@ export default function ExportsPage() {
         }
       }
 
-      // Largeurs colonnes
       ws['!cols'] = [
         { wch: 18 }, { wch: 20 }, { wch: 20 }, { wch: 10 },
         { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 18 },
@@ -142,7 +176,8 @@ export default function ExportsPage() {
   const exportPDF = async () => {
     setLoading(true)
     try {
-      const { data } = await buildQuery()
+      const q = await buildQuery()
+      const { data } = await q
       if (!data || data.length === 0) {
         alert('Aucune inscription trouvée avec ces filtres.')
         setLoading(false)
@@ -154,7 +189,6 @@ export default function ExportsPage() {
 
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
 
-      // En-tête
       doc.setFillColor(13, 27, 75)
       doc.rect(0, 0, 297, 20, 'F')
       doc.setTextColor(255, 255, 255)
@@ -181,7 +215,7 @@ export default function ExportsPage() {
           ins.categorie === 'PRIMAIRE' ? 'Primaire' : ins.categorie === 'SECONDAIRE' ? 'Secondaire' : 'Adulte',
           ins.classe?.nom || ins.niveau_etude || '',
           ins.etablissement || '',
-          (ins.modules || []).map((m: any) => m.module?.nom).filter(Boolean).join(', '),
+          getModulesAffiches(ins),
           ins.session?.nom || '',
           ins.statut === 'VALIDE' ? 'Validé' : ins.statut === 'EN_ATTENTE' ? 'En attente' : 'Désactivé',
         ]),
@@ -234,6 +268,10 @@ export default function ExportsPage() {
     ? classes.filter(c => c.categorie === filters.categorie)
     : classes
 
+  const modulesFiltres = filters.categorie
+    ? modules.filter(m => m.categorie === filters.categorie || m.categorie === 'MULTI')
+    : modules
+
   return (
     <div>
       <div style={{ marginBottom: '28px' }}>
@@ -245,7 +283,6 @@ export default function ExportsPage() {
         </p>
       </div>
 
-      {/* Filtres */}
       <div style={{
         background: 'white', borderRadius: '16px', padding: '24px',
         boxShadow: '0 2px 12px rgba(0,0,0,0.06)', marginBottom: '24px'
@@ -275,7 +312,7 @@ export default function ExportsPage() {
               Catégorie
             </label>
             <select value={filters.categorie}
-              onChange={e => setFilters({ ...filters, categorie: e.target.value, session_id: '', classe_id: '' })}
+              onChange={e => setFilters({ ...filters, categorie: e.target.value, session_id: '', classe_id: '', module_id: '' })}
               style={{ width: '100%', padding: '10px 12px', border: '2px solid #e5e7eb',
                 borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit', outline: 'none' }}>
               <option value="">Toutes catégories</option>
@@ -316,6 +353,20 @@ export default function ExportsPage() {
           <div>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: '700',
               color: '#374151', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Module de formation
+            </label>
+            <select value={filters.module_id}
+              onChange={e => setFilters({ ...filters, module_id: e.target.value })}
+              style={{ width: '100%', padding: '10px 12px', border: '2px solid #e5e7eb',
+                borderRadius: '10px', fontSize: '14px', fontFamily: 'inherit', outline: 'none' }}>
+              <option value="">Tous les modules</option>
+              {modulesFiltres.map(m => <option key={m.id} value={m.id}>📚 {m.nom}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: '700',
+              color: '#374151', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Statut
             </label>
             <select value={filters.statut}
@@ -330,7 +381,6 @@ export default function ExportsPage() {
           </div>
         </div>
 
-        {/* Compteur */}
         {count !== null && (
           <div style={{
             background: '#eff6ff', borderRadius: '10px', padding: '12px 16px',
@@ -344,10 +394,8 @@ export default function ExportsPage() {
         )}
       </div>
 
-      {/* Boutons export */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
 
-        {/* Excel */}
         <div style={{
           background: 'white', borderRadius: '16px', padding: '28px',
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
@@ -371,7 +419,6 @@ export default function ExportsPage() {
           </button>
         </div>
 
-        {/* PDF */}
         <div style={{
           background: 'white', borderRadius: '16px', padding: '28px',
           boxShadow: '0 2px 12px rgba(0,0,0,0.06)',

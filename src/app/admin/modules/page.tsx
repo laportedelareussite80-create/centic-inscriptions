@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import GestionGroupesModule from '@/components/GestionGroupesModule'
 
 interface Classe { id: string; nom: string; categorie: string }
 interface Module {
@@ -20,6 +21,7 @@ export default function ModulesPage() {
   const [selectedClasses, setSelectedClasses] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
+  const [moduleGroupes, setModuleGroupes] = useState<Module | null>(null)
   const supabase = createClient()
 
   useEffect(() => { fetchAll() }, [])
@@ -302,6 +304,11 @@ export default function ModulesPage() {
                   }}>
                     {m.est_actif ? '⏸ Désactiver' : '▶ Activer'}
                   </button>
+                  <button onClick={() => setModuleGroupes(m)} style={{
+                    background: '#f0fdf4', color: '#15803d', border: 'none',
+                    padding: '8px 14px', borderRadius: '8px', fontSize: '13px',
+                    fontWeight: '700', cursor: 'pointer'
+                  }}>👥 Groupes</button>
                   <button onClick={() => openEdit(m)} style={{
                     background: '#eff6ff', color: '#2563EB', border: 'none',
                     padding: '8px 14px', borderRadius: '8px', fontSize: '13px',
@@ -317,6 +324,14 @@ export default function ModulesPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {moduleGroupes && (
+        <GestionGroupesModule
+          moduleId={moduleGroupes.id}
+          moduleNom={moduleGroupes.nom}
+          onClose={() => setModuleGroupes(null)}
+        />
       )}
     </div>
   )

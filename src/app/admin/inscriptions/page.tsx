@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import ModalEditionInscription from '@/components/ModalEditionInscription'
 
 interface Inscription {
   id: string
@@ -28,6 +29,7 @@ interface Inscription {
   ville: string
   created_at: string
   validated_at: string
+  classe_id?: string
   classe?: { id: string; nom: string }
   session?: { id: string; nom: string }
   annee?: { id: string; nom: string; annee: number }
@@ -37,6 +39,7 @@ interface Inscription {
 
 export default function InscriptionsPage() {
   const [inscriptions, setInscriptions] = useState<Inscription[]>([])
+  const [classes, setClasses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatut, setFilterStatut] = useState('')
@@ -44,10 +47,19 @@ export default function InscriptionsPage() {
   const [selected, setSelected] = useState<Inscription | null>(null)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
+  const [editionEnCours, setEditionEnCours] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
-  useEffect(() => { fetchInscriptions() }, [])
+  useEffect(() => {
+    fetchInscriptions()
+    fetchClasses()
+  }, [])
+
+  const fetchClasses = async () => {
+    const { data } = await supabase.from('classes').select('*').order('ordre')
+    setClasses(data || [])
+  }
 
   const fetchInscriptions = async () => {
     setLoading(true)
@@ -127,7 +139,6 @@ export default function InscriptionsPage() {
       {/* LISTE GAUCHE */}
       <div style={{ flex: selected ? '0 0 420px' : '1', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
-        {/* Titre + stats */}
         <div style={{ marginBottom: '20px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: '900', color: '#0D1B4B', marginBottom: '4px' }}>
             📋 Inscriptions
@@ -148,7 +159,6 @@ export default function InscriptionsPage() {
           </div>
         )}
 
-        {/* Filtres */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="🔍 Rechercher..."
@@ -172,7 +182,6 @@ export default function InscriptionsPage() {
           </select>
         </div>
 
-        {/* Liste */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {loading ? (
             <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>⏳ Chargement...</div>
@@ -232,7 +241,6 @@ export default function InscriptionsPage() {
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
           overflowY: 'auto', padding: '28px'
         }}>
-          {/* Header détail */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               {selected.photo_url ? (
@@ -285,6 +293,11 @@ export default function InscriptionsPage() {
                 fontWeight: '700', cursor: 'pointer'
               }}>▶ Réactiver</button>
             )}
+            <button onClick={() => setEditionEnCours(true)} style={{
+              background: '#fff7ed', color: '#c2410c', border: 'none',
+              padding: '10px 18px', borderRadius: '10px', fontSize: '13px',
+              fontWeight: '700', cursor: 'pointer'
+            }}>✏️ Modifier</button>
             <button onClick={() => window.open(`/print/pdf/${selected.id}`, '_blank')} style={{
               background: '#f3e8ff', color: '#7c3aed', border: 'none',
               padding: '10px 18px', borderRadius: '10px', fontSize: '13px',
@@ -305,7 +318,6 @@ export default function InscriptionsPage() {
           {/* Infos */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
 
-            {/* Infos apprenant */}
             <div style={{ background: '#f8faff', borderRadius: '14px', padding: '18px' }}>
               <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#0D1B4B',
                 marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -338,7 +350,6 @@ export default function InscriptionsPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Modules */}
               <div style={{ background: '#f8faff', borderRadius: '14px', padding: '18px' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#0D1B4B',
                   marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -356,7 +367,6 @@ export default function InscriptionsPage() {
                 ) : <p style={{ color: '#888', fontSize: '13px' }}>Aucun module</p>}
               </div>
 
-              {/* Tuteur */}
               {selected.categorie !== 'ADULTE' && selected.tuteurs && selected.tuteurs.length > 0 && (
                 <div style={{ background: '#f8faff', borderRadius: '14px', padding: '18px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#0D1B4B',
@@ -378,7 +388,6 @@ export default function InscriptionsPage() {
                 </div>
               )}
 
-              {/* Session */}
               <div style={{ background: '#f8faff', borderRadius: '14px', padding: '18px' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#0D1B4B',
                   marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -400,6 +409,18 @@ export default function InscriptionsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {editionEnCours && selected && (
+        <ModalEditionInscription
+          inscription={selected as any}
+          classes={classes}
+          onClose={() => setEditionEnCours(false)}
+          onSaved={(updated) => {
+            setSelected(prev => prev ? { ...prev, ...updated } as Inscription : null)
+            fetchInscriptions()
+          }}
+        />
       )}
     </div>
   )
