@@ -80,7 +80,7 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
     setEnregistrement(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('Session expirée')
+      if (!session) throw new Error('Session expiree')
 
       const { data: appel, error: appelError } = await supabase
         .from('appels')
@@ -108,7 +108,7 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
       setAppelTermine(true)
     } catch (e) {
       console.error(e)
-      alert('Une erreur est survenue lors de l\'enregistrement. Veuillez réessayer.')
+      alert('Une erreur est survenue lors de l\'enregistrement. Veuillez reessayer.')
     } finally {
       setEnregistrement(false)
     }
@@ -119,14 +119,19 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
     setGenererImage(true)
     try {
       const html2canvas = (await import('html2canvas')).default
-      const canvas = await html2canvas(feuilleRef.current, { scale: 2, backgroundColor: '#ffffff' })
+      const canvas = await html2canvas(feuilleRef.current, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        width: 794,
+        windowWidth: 794,
+      })
       const lien = document.createElement('a')
       lien.download = `Appel_${module.nom.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.png`
       lien.href = canvas.toDataURL('image/png')
       lien.click()
     } catch (e) {
       console.error(e)
-      alert('Une erreur est survenue lors de la génération de l\'image.')
+      alert('Une erreur est survenue lors de la generation de l\'image.')
     } finally {
       setGenererImage(false)
     }
@@ -138,7 +143,12 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
     try {
       const html2canvas = (await import('html2canvas')).default
       const { jsPDF } = await import('jspdf')
-      const canvas = await html2canvas(feuilleRef.current, { scale: 2, backgroundColor: '#ffffff' })
+      const canvas = await html2canvas(feuilleRef.current, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        width: 794,
+        windowWidth: 794,
+      })
       const imgData = canvas.toDataURL('image/png')
 
       const pdf = new jsPDF('p', 'mm', 'a4')
@@ -163,7 +173,7 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
       pdf.save(`Appel_${module.nom.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`)
     } catch (e) {
       console.error(e)
-      alert('Une erreur est survenue lors de la génération du PDF.')
+      alert('Une erreur est survenue lors de la generation du PDF.')
     } finally {
       setGenererPdf(false)
     }
@@ -172,7 +182,7 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
   const nbPresents = eleves.filter(e => e.present).length
 
   if (loading) {
-    return <p style={{ textAlign: 'center', color: '#888', padding: '60px' }}>⏳ Chargement de la liste...</p>
+    return <p style={{ textAlign: 'center', color: '#888', padding: '60px' }}>Chargement de la liste...</p>
   }
 
   if (eleves.length === 0) {
@@ -185,12 +195,11 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
         <button onClick={onTermine} style={{
           background: '#1A3A8F', color: 'white', border: 'none',
           padding: '10px 24px', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
-        }}>← Recommencer</button>
+        }}>Recommencer</button>
       </div>
     )
   }
 
-  // ÉCRAN DE FIN — après enregistrement, propose le téléchargement
   if (appelTermine) {
     return (
       <div>
@@ -200,14 +209,13 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
         }}>
           <span style={{ fontSize: '32px' }}>✅</span>
           <div>
-            <p style={{ fontWeight: '800', color: '#166534', fontSize: '16px' }}>Appel enregistré avec succès !</p>
+            <p style={{ fontWeight: '800', color: '#166534', fontSize: '16px' }}>Appel enregistre avec succes !</p>
             <p style={{ fontSize: '13px', color: '#15803d' }}>
-              {nbPresents} présent{nbPresents > 1 ? 's' : ''} sur {eleves.length} apprenant{eleves.length > 1 ? 's' : ''}
+              {nbPresents} present{nbPresents > 1 ? 's' : ''} sur {eleves.length} apprenant{eleves.length > 1 ? 's' : ''}
             </p>
           </div>
         </div>
 
-        {/* Feuille visuelle pour export */}
         <div ref={feuilleRef} style={{
           background: 'white', borderRadius: '4px', padding: '32px',
           border: '1px solid #e5e7eb', marginBottom: '24px'
@@ -215,13 +223,13 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', borderBottom: '3px solid #0D1B4B', paddingBottom: '16px' }}>
             <img src="/images/logo_centic.jpg" alt="CENTIC" style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover' }} />
             <div>
-              <p style={{ fontSize: '18px', fontWeight: '900', color: '#0D1B4B' }}>FEUILLE DE PRÉSENCE — CENTIC</p>
+              <p style={{ fontSize: '18px', fontWeight: '900', color: '#0D1B4B' }}>FEUILLE DE PRESENCE — CENTIC</p>
               <p style={{ fontSize: '13px', color: '#666' }}>{dateAujourdhui}</p>
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '20px', fontSize: '13px' }}>
-            <p><strong>Catégorie :</strong> {categorieLabel[categorie] || categorie}</p>
+            <p><strong>Categorie :</strong> {categorieLabel[categorie] || categorie}</p>
             <p><strong>Module :</strong> {module.nom}</p>
             <p><strong>Groupe :</strong> {groupe ? groupe.nom : 'Tous'}</p>
             <p><strong>Encadreur :</strong> {encadreurNom}</p>
@@ -230,10 +238,10 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: '#0D1B4B' }}>
-                <th style={{ color: 'white', padding: '8px', textAlign: 'left', border: '1px solid #0D1B4B' }}>N°</th>
+                <th style={{ color: 'white', padding: '8px', textAlign: 'left', border: '1px solid #0D1B4B' }}>N</th>
                 <th style={{ color: 'white', padding: '8px', textAlign: 'left', border: '1px solid #0D1B4B' }}>Nom complet</th>
-                <th style={{ color: 'white', padding: '8px', textAlign: 'left', border: '1px solid #0D1B4B' }}>N° Inscription</th>
-                <th style={{ color: 'white', padding: '8px', textAlign: 'center', border: '1px solid #0D1B4B' }}>Présence</th>
+                <th style={{ color: 'white', padding: '8px', textAlign: 'left', border: '1px solid #0D1B4B' }}>N Inscription</th>
+                <th style={{ color: 'white', padding: '8px', textAlign: 'center', border: '1px solid #0D1B4B' }}>Presence</th>
               </tr>
             </thead>
             <tbody>
@@ -246,7 +254,7 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
                     padding: '7px 8px', border: '1px solid #e5e7eb', textAlign: 'center',
                     fontWeight: '700', color: e.present ? '#166534' : '#991b1b'
                   }}>
-                    {e.present ? 'Présent' : 'Absent'}
+                    {e.present ? 'Present' : 'Absent'}
                   </td>
                 </tr>
               ))}
@@ -254,7 +262,7 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
           </table>
 
           <p style={{ marginTop: '20px', fontSize: '12px', color: '#999', textAlign: 'right' }}>
-            Total : {eleves.length} apprenants — {nbPresents} présents — {eleves.length - nbPresents} absents
+            Total : {eleves.length} apprenants — {nbPresents} presents — {eleves.length - nbPresents} absents
           </p>
         </div>
 
@@ -263,26 +271,25 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
             background: '#dc2626', color: 'white', border: 'none',
             padding: '12px 24px', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
           }}>
-            {genererPdf ? '⏳ Génération...' : '📄 Télécharger en PDF'}
+            {genererPdf ? 'Generation...' : 'Telecharger en PDF'}
           </button>
           <button onClick={telechargerImage} disabled={genererImage} style={{
             background: '#059669', color: 'white', border: 'none',
             padding: '12px 24px', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
           }}>
-            {genererImage ? '⏳ Génération...' : '🖼️ Télécharger en image'}
+            {genererImage ? 'Generation...' : 'Telecharger en image'}
           </button>
           <button onClick={onTermine} style={{
             background: '#f3f4f6', color: '#666', border: 'none',
             padding: '12px 24px', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer'
           }}>
-            ← Nouvel appel
+            Nouvel appel
           </button>
         </div>
       </div>
     )
   }
 
-  // ÉCRAN DE SAISIE DE L'APPEL
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
@@ -296,11 +303,11 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
           <button onClick={() => toutMarquer(true)} style={{
             background: '#dcfce7', color: '#166534', border: 'none',
             padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer'
-          }}>✓ Tous présents</button>
+          }}>Tous presents</button>
           <button onClick={() => toutMarquer(false)} style={{
             background: '#fee2e2', color: '#991b1b', border: 'none',
             padding: '8px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '700', cursor: 'pointer'
-          }}>✕ Tous absents</button>
+          }}>Tous absents</button>
         </div>
       </div>
 
@@ -308,7 +315,7 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
         background: '#eff6ff', borderRadius: '12px', padding: '12px 18px',
         marginBottom: '16px', fontSize: '14px', color: '#1A3A8F', fontWeight: '600'
       }}>
-        👥 {nbPresents} présent{nbPresents > 1 ? 's' : ''} / {eleves.length} apprenant{eleves.length > 1 ? 's' : ''}
+        {nbPresents} present{nbPresents > 1 ? 's' : ''} / {eleves.length} apprenant{eleves.length > 1 ? 's' : ''}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
@@ -331,7 +338,7 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
               background: e.present ? '#dcfce7' : '#fee2e2',
               color: e.present ? '#166534' : '#991b1b'
             }}>
-              {e.present ? '✓ Présent' : '✕ Absent'}
+              {e.present ? 'Present' : 'Absent'}
             </div>
           </div>
         ))}
@@ -342,7 +349,7 @@ export default function FeuilleAppel({ module, groupe, categorie, encadreurNom, 
         color: 'white', border: 'none', padding: '16px', borderRadius: '12px',
         fontSize: '16px', fontWeight: '700', cursor: enregistrement ? 'not-allowed' : 'pointer'
       }}>
-        {enregistrement ? '⏳ Enregistrement...' : '✅ Valider l\'appel'}
+        {enregistrement ? 'Enregistrement...' : 'Valider l\'appel'}
       </button>
     </div>
   )
